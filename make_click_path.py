@@ -5,6 +5,7 @@ import tkinter.simpledialog as sd
 from tkinter.scrolledtext import ScrolledText
 import pyautogui as pa
 import time
+from files_to_Inspection_Manager import import_window
 
 actions = [] # can be ('click', (x,y)) or ('type', 'some_string') or ('press', 'some_key_combination')
 slider_values = []
@@ -97,7 +98,15 @@ def remove_action(index):
         descriptions.pop(index)
         update_actions()
 
+    if len(actions) == 0:
+        print(header_widgets)
+        for widget in header_widgets:
+            widget.destroy()
+    
+        header_widgets.clear()
+
 # Lists to keep track of button and label widgets
+header_widgets = []
 remove_button_widgets = []
 action_label_widgets = []
 slider_widgets = []
@@ -119,6 +128,8 @@ def set_action_labels(event=None):
             
 def update_actions(event=None):
     # Clear the widget lists
+    for widget in header_widgets:
+        widget.destroy()
     for widget in remove_button_widgets:
         widget.destroy()
     for widget in action_label_widgets:
@@ -129,16 +140,24 @@ def update_actions(event=None):
     for widget in description_widgets:
         widget.destroy()
 
+    header_widgets.clear()
     remove_button_widgets.clear()
     action_label_widgets.clear()
     slider_widgets.clear()
     description_widgets.clear()
 
-    fnt = 'Helvetica 10 bold'
-    # tk.Label(action_text, text='Remove', justify='left', font=fnt).grid(row=0, column=0, sticky='W')
-    tk.Label(action_text, text='Delay 1/100[s]', justify='left', font=fnt).grid(row=0, column=2, columnspan=2, sticky='W')
-    tk.Label(action_text, text='Action', justify='left', font=fnt).grid(row=0, column=1, sticky='W')
-    tk.Label(action_text, text='Description', justify='left', font=fnt).grid(row=0, column=4, sticky='W')
+    if len(actions) > 0:
+        fnt = 'Helvetica 10 bold'
+        # l0 = tk.Label(action_text, text='Remove', justify='left', font=fnt).grid(row=0, column=0, sticky='W')
+        l1 = tk.Label(action_text, text='Delay 1/100[s]', justify='left', font=fnt)
+        l1.grid(row=0, column=2, columnspan=2, sticky='W')
+        header_widgets.append(l1)
+        l2 = tk.Label(action_text, text='Action', justify='left', font=fnt)
+        l2.grid(row=0, column=1, sticky='W')
+        header_widgets.append(l2)
+        l3 = tk.Label(action_text, text='Description', justify='left', font=fnt)
+        l3.grid(row=0, column=4, sticky='W')
+        header_widgets.append(l3)
 
     for i, _ in enumerate(actions):
         remove_button = tk.Button(action_text, text="Remove", command=lambda i=i: remove_action(i))
@@ -166,14 +185,20 @@ def update_actions(event=None):
     # action_text.config(state=tk.DISABLED)
 
 def execute_program():
-
-    def execute_actions():
+    def execute_actions(type_adapt = None):
         for i, action in enumerate(actions):
             if action[0] == 'click':
                 x,y = action[1]
                 pa.click(x, y)
             elif action[0] == 'type':
-                pa.write(action[1])
+                if type_adapt != None:
+                    new_action = action[1]
+                    for adaption in type_adapt: #adaption = ('old_substring', 'new_substring')
+                        old_s,new_s = adaption
+                        new_action = new_action.replace(old_s,new_s)
+                    pa.write(new_action)
+                else:
+                    pa.write(action[1])
             elif action[0] == 'press':
                 pa.press(human_readable_to_pyautogui[action[1]])
             elif action[0] == 'picture_press_open':
@@ -191,13 +216,15 @@ def execute_program():
                 
             time.sleep(slider_values[i].get()/100)
 
-    execute_actions()
-    
-    
-    # if variable_program != None:
-    #     pass
-    # else:
-    #     variable_program
+    variable_program = None
+    # variable_program = {'<i>' : [1,2,3,4]}
+
+    if variable_program == None:
+        execute_actions()
+    else:
+        for variable in variable_program.items():
+            for value in variable[1]:
+                execute_actions(type_adapt=[(variable[0],str(value))])
 
 def save_program():
     f = fd.asksaveasfile(title='Choose name to save to', mode='w', defaultextension=".prog")
@@ -209,49 +236,58 @@ def save_program():
     f.close()
 
 def load_program():
-    global actions, slider_values, descriptions
-    f = fd.askopenfile(title='Choose program to open')
-    
-    actions = []
-    slider_values = []
-    descriptions = []
+    wait_done = tk.StringVar(value='Opening files')
+    import_window(root, wait_done)
+    root.wait_variable(wait_done)
 
-    for line in f.readlines():
-        print(line)
-        a,s,d = line.split(',')
-        (action, val) = a.split(';')
-        val = val.strip()
-        if action == 'click':
-            val = tuple( map(int,val.split('-')) )
-        d = d.strip()
-        d = d if d != 'None' else ''
-        actions.append( (action,val) ) 
-        slider_values.append( tk.IntVar(value=int(s)) )
-        descriptions.append( tk.StringVar(value=d) )
-    f.close()
+    if wait_done.get() == 'Done':
+        global actions, slider_values, descriptions
+        f = fd.askopenfile(title='Choose program to open')
+        
+        actions = []
+        slider_values = []
+        descriptions = []
 
-    on_entry_focus_out(None)
+        for line in f.readlines():
+            print(line)
+            a,s,d = line.split(',')
+            (action, val) = a.split(';')
+            val = val.strip() 
+            if action == 'click':
+                val = tuple( map(int,val.split('-')) )
+            d = d.strip()
+            d = d if d != 'None' else ''
+            actions.append( (action,val) ) 
+            slider_values.append( tk.IntVar(value=int(s)) )
+            descriptions.append( tk.StringVar(value=d) )
+        f.close()
 
-    update_actions()
+        on_entry_focus_out(None)
+
+        update_actions()
+    else:
+        sd.Dialog(root,'Did not open files')
         
 # Create the main window
 root = tk.Tk()
 root.title("Mouse actions Recorder")
 
 # Create a button to click all the recorded actions
-btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10, borderwidth=3)
+btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10)
 
-btn = tk.Button(btn_frame, text="Load program", command=load_program)
-btn.grid(row=0,column=0,sticky='ew', pady=1)
-btn = tk.Button(btn_frame, text="Save program", command=save_program)
-btn.grid(row=0,column=1,sticky='ew', pady=1)
+row=0
+btn = tk.Button(btn_frame, text="Load excel files", command=load_program)
+btn.grid(row=row,column=0,sticky='ew', pady=1)
+row=1
 btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
-btn.grid(row=1,column=0,sticky='ew', pady=5, columnspan=2)
-ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=2, column=0, columnspan=2, sticky='ew')
+btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
+row=2
+ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
+row=3
 btn = tk.Button(btn_frame, text="Add button press", command=record_press)
-btn.grid(row=3,column=0,sticky='ew', pady=12)
+btn.grid(row=row,column=0,sticky='ew', pady=12)
 btn = tk.Button(btn_frame, text="Add typing text", command=record_type)
-btn.grid(row=3,column=1,sticky='ew', pady=12)
+btn.grid(row=row,column=1,sticky='ew', pady=12)
 
 btn_frame.grid_columnconfigure(0, weight=1)
 btn_frame.grid_columnconfigure(1, weight=1)
@@ -264,7 +300,7 @@ def onFrameConfigure(canvas):
     canvas.configure(scrollregion=canvas.bbox("all"))
 
 canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
-action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10, borderwidth=3, relief='sunken')
+action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10)
 action_text.pack(pady=20, padx=20)
 vsb = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
 canvas.configure(yscrollcommand=vsb.set)
@@ -290,3 +326,6 @@ update_actions()
 
 # Start the tkinter main loop
 root.mainloop()
+
+from pprint import pprint
+pprint(actions)
