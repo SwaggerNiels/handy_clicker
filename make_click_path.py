@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 import tkinter.filedialog as fd
 import tkinter.simpledialog as sd
 import pyautogui as pa
@@ -7,13 +8,56 @@ import time
 actions = [] # can be ('click', (x,y)) or ('type', 'some_string') or ('press', 'some_key_combination')
 slider_values = []
 descriptions = []
+human_readable_to_pyautogui = {
+    'Tab': '\t',
+    'Enter': '\n',
+    'Space': ' ',
+    'Exclamation Mark': '!',
+    'Double Quote': '"',
+    'Hash': '#',
+    'Dollar Sign': '$',
+    'Percent': '%',
+    'Ampersand': '&',
+    'Single Quote': "'",
+}
+
+press_options = list(human_readable_to_pyautogui.keys())
 
 def on_entry_focus_in(event): pass
 def on_entry_focus_out(event): pass
 
+def press_popup():
+    popup = tk.Toplevel(root)
+    popup.title("Select an Option")
 
-def record_type(event):
-    typed_input = sd.askstring('What to type?')
+    # Create a dropdown menu using the predefined list of items
+    selected_option = tk.StringVar()
+    selected_option.set(press_options[0])  # Set the default option
+
+    dropdown = ttk.Combobox(popup, textvariable=selected_option, values=press_options)
+    dropdown.pack(padx=20, pady=10)
+
+    # Function to save the chosen option to a variable
+    def save_choice():
+        choice = selected_option.get()
+        # You can save the chosen option to a variable or perform any desired action here
+        popup.destroy()
+
+    ok_button = tk.Button(popup, text="OK", command=save_choice)
+    ok_button.pack(pady=10)
+    return selected_option
+
+def record_press(event=None):
+    press_input = press_popup()
+    actions.append(('press',press_input.get()))
+    slider_var = tk.IntVar(value=50)
+    slider_values.append(slider_var)
+    description_var = tk.StringVar(value='')
+    descriptions.append(description_var)
+    update_actions()
+    
+def record_type(event=None):
+    typed_input = sd.askstring(title='What to type?', prompt='your input')
     actions.append(('type',typed_input))
     slider_var = tk.IntVar(value=50)
     slider_values.append(slider_var)
@@ -21,7 +65,7 @@ def record_type(event):
     descriptions.append(description_var)
     update_actions()
 
-def record_click(event):
+def record_click(event=None):
     mouse_x, mouse_y = pa.position()
     actions.append(('click',(mouse_x, mouse_y)))
     slider_var = tk.IntVar(value=50)
@@ -29,17 +73,8 @@ def record_click(event):
     description_var = tk.StringVar(value='')
     descriptions.append(description_var)
     update_actions()
-
-def record_click(event):
-    mouse_x, mouse_y = pa.position()
-    actions.append(('click',(mouse_x, mouse_y)))
-    slider_var = tk.IntVar(value=50)
-    slider_values.append(slider_var)
-    description_var = tk.StringVar(value='')
-    descriptions.append(description_var)
-    update_actions()
-
-def remove_coordinate(index):
+    
+def remove_action(index):
     if index < len(actions):
         # Destroy the "Remove" button and the actions label
         remove_button_widgets[index].destroy()
@@ -69,8 +104,10 @@ def set_action_labels():
         elif action[0] == 'type':
             typed_input = action[1]
             label.config(text=f"type: {typed_input} t={t:<5}")        
+        elif action[0] == 'press':
+            press_input = action[1]
+            label.config(text=f"press: {press_input} t={t:<5}")        
             
-
 def update_actions(event=None):
     action_text.config(state=tk.NORMAL)
     action_text.delete(1.0, tk.END)
@@ -90,8 +127,8 @@ def update_actions(event=None):
     slider_widgets.clear()
     description_widgets.clear()
 
-    for i, coord in enumerate(actions):
-        remove_button = tk.Button(action_text, text="Remove", command=lambda i=i: remove_coordinate(i))
+    for i, action in enumerate(actions):
+        remove_button = tk.Button(action_text, text="Remove", command=lambda i=i: remove_action(i))
         remove_button.grid(row=i, column=0)
         remove_button_widgets.append(remove_button)
         
@@ -101,10 +138,9 @@ def update_actions(event=None):
         slider.grid(row=i, column=2)
         slider.config(font=("Helvetica", 1))
         
-        t = slider_values[i].get()
-        coordinates_label = tk.Label(action_text)
-        coordinates_label.grid(row=i, column=1)
-        action_label_widgets.append(coordinates_label)
+        action_label = tk.Label(action_text)
+        action_label.grid(row=i, column=1)
+        action_label_widgets.append(action_label)
         set_action_labels()
         
         description = tk.Entry(action_text, width=30, textvariable=descriptions[i], )
@@ -116,15 +152,25 @@ def update_actions(event=None):
     action_text.config(state=tk.DISABLED)
 
 def execute_program():
-    for i, coord in enumerate(actions):
-        pa.click(coord[0], coord[1])
+    for i, action in enumerate(actions): 
+        
+        if action[0] == 'click':
+            x,y = action[1]
+            pa.click(x, y)
+        elif action[0] == 'type':
+            pa.write(action[1])
+        elif action[0] == 'press':
+            pa.press(human_readable_to_pyautogui[action[1]])
+            
         time.sleep(slider_values[i].get()/100)
 
 def save_program():
     f = fd.asksaveasfile(title='Choose name to save to', mode='w', defaultextension=".prog")
-    for c,s,d in zip(actions, slider_values, descriptions):
+    for (action,val),s,d in zip(actions, slider_values, descriptions):
         d = d.get() if d.get() != '' else 'None'
-        f.write(f'{c[0]};{c[1]}, {s.get()}, {d}\n')
+        if action == 'click':
+            val = f'{val[0]}-{val[1]}'
+        f.write(f'{action}; {val}, {s.get()}, {d}\n')
     f.close()
 
 def load_program():
@@ -136,10 +182,13 @@ def load_program():
     descriptions = []
 
     for line in f.readlines():
-        c,s,d = line.split(',')
+        a,s,d = line.split(',')
+        (action, val) = a.split(';')
+        if action == 'click':
+            val = tuple(val.split('-'))
         d = d.strip()
         d = d if d != 'None' else ''
-        actions.append( tuple(map(int,c.split(';'))) ) 
+        actions.append( (action,val) ) 
         slider_values.append( tk.IntVar(value=int(s)) )
         descriptions.append( tk.StringVar(value=d) )
     f.close()
@@ -157,7 +206,9 @@ action_text = tk.Text(root, height=10, width=10, state=tk.DISABLED)
 action_text.pack(pady=20, padx=20)
 
 # Create a button to click all the recorded actions
-type_btn = tk.Button(root, text="Execute program", command=execute_program)
+type_btn = tk.Button(root, text="Add button press", command=record_press)
+type_btn.pack()
+type_btn = tk.Button(root, text="Add typing text", command=record_type)
 type_btn.pack()
 execute_btn = tk.Button(root, text="Execute program", command=execute_program)
 execute_btn.pack()
