@@ -2,15 +2,18 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog as fd
 import tkinter.simpledialog as sd
+from tkinter.scrolledtext import ScrolledText
 import pyautogui as pa
 import time
 
 actions = [] # can be ('click', (x,y)) or ('type', 'some_string') or ('press', 'some_key_combination')
 slider_values = []
 descriptions = []
+
 human_readable_to_pyautogui = {
     'Tab': '\t',
     'Enter': '\n',
+    'Return': '\r',
     'Space': ' ',
     'Exclamation Mark': '!',
     'Double Quote': '"',
@@ -31,25 +34,31 @@ def press_popup():
     popup.title("Select an Option")
 
     # Create a dropdown menu using the predefined list of items
-    selected_option = tk.StringVar()
-    selected_option.set(press_options[0])  # Set the default option
+    selected_option = tk.StringVar(master=root)
+    choice = press_options[0]
+    selected_option.set(choice)  # Set the default option
 
     dropdown = ttk.Combobox(popup, textvariable=selected_option, values=press_options)
     dropdown.pack(padx=20, pady=10)
+    
+    dropdown.wait_variable(selected_option)
+    choice = selected_option.get()
+    popup.destroy()
 
-    # Function to save the chosen option to a variable
-    def save_choice():
-        choice = selected_option.get()
-        # You can save the chosen option to a variable or perform any desired action here
-        popup.destroy()
+    return choice
 
-    ok_button = tk.Button(popup, text="OK", command=save_choice)
-    ok_button.pack(pady=10)
-    return selected_option
+# def record_picturepress(event=None):
+#     press_input = press_popup()
+#     actions.append(('press',press_input))
+#     slider_var = tk.IntVar(value=50)
+#     slider_values.append(slider_var)
+#     description_var = tk.StringVar(value='')
+#     descriptions.append(description_var)
+#     update_actions()
 
 def record_press(event=None):
     press_input = press_popup()
-    actions.append(('press',press_input.get()))
+    actions.append(('press',press_input))
     slider_var = tk.IntVar(value=50)
     slider_values.append(slider_var)
     description_var = tk.StringVar(value='')
@@ -79,7 +88,8 @@ def remove_action(index):
         # Destroy the "Remove" button and the actions label
         remove_button_widgets[index].destroy()
         action_label_widgets[index].destroy()
-        slider_widgets[index].destroy()
+        slider_widgets[index][0].destroy()
+        slider_widgets[index][1].destroy()
         description_widgets[index].destroy()
 
         actions.pop(index)
@@ -93,32 +103,29 @@ action_label_widgets = []
 slider_widgets = []
 description_widgets = []
 
-def set_action_labels():
+def set_action_labels(event=None):
     for i,label in enumerate(action_label_widgets):
         action = actions[i]
-        t = slider_values[i].get()
         
         if action[0] == 'click':
             x,y = action[1]
-            label.config(text=f"({x:<5}, {y:<5}) t={t:<5}")
+            label.config(text=f"click: ({x:<5}, {y:<5})")
         elif action[0] == 'type':
             typed_input = action[1]
-            label.config(text=f"type: {typed_input} t={t:<5}")        
+            label.config(text=f"type: {typed_input}")        
         elif action[0] == 'press':
             press_input = action[1]
-            label.config(text=f"press: {press_input} t={t:<5}")        
+            label.config(text=f"press: {press_input}")        
             
 def update_actions(event=None):
-    action_text.config(state=tk.NORMAL)
-    action_text.delete(1.0, tk.END)
-
     # Clear the widget lists
     for widget in remove_button_widgets:
         widget.destroy()
     for widget in action_label_widgets:
         widget.destroy()
-    for widget in slider_widgets:
-        widget.destroy()
+    for widgets in slider_widgets:
+        for widget in widgets:
+            widget.destroy()
     for widget in description_widgets:
         widget.destroy()
 
@@ -127,42 +134,70 @@ def update_actions(event=None):
     slider_widgets.clear()
     description_widgets.clear()
 
-    for i, action in enumerate(actions):
+    fnt = 'Helvetica 10 bold'
+    # tk.Label(action_text, text='Remove', justify='left', font=fnt).grid(row=0, column=0, sticky='W')
+    tk.Label(action_text, text='Delay 1/100[s]', justify='left', font=fnt).grid(row=0, column=2, columnspan=2, sticky='W')
+    tk.Label(action_text, text='Action', justify='left', font=fnt).grid(row=0, column=1, sticky='W')
+    tk.Label(action_text, text='Description', justify='left', font=fnt).grid(row=0, column=4, sticky='W')
+
+    for i, _ in enumerate(actions):
         remove_button = tk.Button(action_text, text="Remove", command=lambda i=i: remove_action(i))
-        remove_button.grid(row=i, column=0)
+        remove_button.grid(row=i+1, column=0)
         remove_button_widgets.append(remove_button)
         
+        slider_label = tk.Label(action_text, textvariable=slider_values[i])
+        slider_label.grid(row=i+1, column=2, sticky='W')
         slider = tk.Scale(action_text, from_=0, to=1000, orient="horizontal", variable=slider_values[i],
-                          length=200, resolution=25, command=set_action_labels)
-        slider_widgets.append(slider)
-        slider.grid(row=i, column=2)
-        slider.config(font=("Helvetica", 1))
+                          length=200, resolution=25, command=set_action_labels, showvalue=0)
+        slider_widgets.append((slider_label,slider))
+        slider.grid(row=i+1, column=3)
         
-        action_label = tk.Label(action_text)
-        action_label.grid(row=i, column=1)
+        action_label = tk.Label(action_text, wraplength=200, justify='left')
+        action_label.grid(row=i+1, column=1, sticky='W')
         action_label_widgets.append(action_label)
         set_action_labels()
         
         description = tk.Entry(action_text, width=30, textvariable=descriptions[i], )
-        description.grid(row=i, column=3)
+        description.grid(row=i+1, column=4)
         description_widgets.append(description)
         description.bind('<FocusIn>', on_entry_focus_in)
         description.bind('<FocusOut>', on_entry_focus_out)
 
-    action_text.config(state=tk.DISABLED)
+    # action_text.config(state=tk.DISABLED)
 
 def execute_program():
-    for i, action in enumerate(actions): 
-        
-        if action[0] == 'click':
-            x,y = action[1]
-            pa.click(x, y)
-        elif action[0] == 'type':
-            pa.write(action[1])
-        elif action[0] == 'press':
-            pa.press(human_readable_to_pyautogui[action[1]])
-            
-        time.sleep(slider_values[i].get()/100)
+
+    def execute_actions():
+        for i, action in enumerate(actions):
+            if action[0] == 'click':
+                x,y = action[1]
+                pa.click(x, y)
+            elif action[0] == 'type':
+                pa.write(action[1])
+            elif action[0] == 'press':
+                pa.press(human_readable_to_pyautogui[action[1]])
+            elif action[0] == 'picture_press_open':
+                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Openen_btn.png',grayscale=True, confidence=.5)
+                pa.click(x1+w/2, y1+h/2)
+            elif action[0] == 'picture_press_sample':
+                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Sample_add_btn.png',grayscale=True, confidence=.5)
+                pa.click(x1+w*.98, y1+h*.95)
+            elif action[0] == 'picture_press_create':
+                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Create_btn.png',grayscale=True, confidence=.5)
+                pa.click(x1+w/2, y1+h/2)
+            elif action[0] == 'picture_press_import':
+                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Import_btn.png',grayscale=True, confidence=.5)
+                pa.click(x1+w*.25, y1+h/2)
+                
+            time.sleep(slider_values[i].get()/100)
+
+    execute_actions()
+    
+    
+    # if variable_program != None:
+    #     pass
+    # else:
+    #     variable_program
 
 def save_program():
     f = fd.asksaveasfile(title='Choose name to save to', mode='w', defaultextension=".prog")
@@ -170,7 +205,7 @@ def save_program():
         d = d.get() if d.get() != '' else 'None'
         if action == 'click':
             val = f'{val[0]}-{val[1]}'
-        f.write(f'{action}; {val}, {s.get()}, {d}\n')
+        f.write(f'{action};{val},{s.get()},{d}\n')
     f.close()
 
 def load_program():
@@ -182,10 +217,12 @@ def load_program():
     descriptions = []
 
     for line in f.readlines():
+        print(line)
         a,s,d = line.split(',')
         (action, val) = a.split(';')
+        val = val.strip()
         if action == 'click':
-            val = tuple(val.split('-'))
+            val = tuple( map(int,val.split('-')) )
         d = d.strip()
         d = d if d != 'None' else ''
         actions.append( (action,val) ) 
@@ -201,21 +238,43 @@ def load_program():
 root = tk.Tk()
 root.title("Mouse actions Recorder")
 
-# Create a text widget to display the recorded actions
-action_text = tk.Text(root, height=10, width=10, state=tk.DISABLED)
-action_text.pack(pady=20, padx=20)
-
 # Create a button to click all the recorded actions
-type_btn = tk.Button(root, text="Add button press", command=record_press)
-type_btn.pack()
-type_btn = tk.Button(root, text="Add typing text", command=record_type)
-type_btn.pack()
-execute_btn = tk.Button(root, text="Execute program", command=execute_program)
-execute_btn.pack()
-load_btn = tk.Button(root, text="Load program", command=load_program)
-load_btn.pack()
-save_btn = tk.Button(root, text="Save program", command=save_program)
-save_btn.pack()
+btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10, borderwidth=3)
+
+btn = tk.Button(btn_frame, text="Load program", command=load_program)
+btn.grid(row=0,column=0,sticky='ew', pady=1)
+btn = tk.Button(btn_frame, text="Save program", command=save_program)
+btn.grid(row=0,column=1,sticky='ew', pady=1)
+btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
+btn.grid(row=1,column=0,sticky='ew', pady=5, columnspan=2)
+ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=2, column=0, columnspan=2, sticky='ew')
+btn = tk.Button(btn_frame, text="Add button press", command=record_press)
+btn.grid(row=3,column=0,sticky='ew', pady=12)
+btn = tk.Button(btn_frame, text="Add typing text", command=record_type)
+btn.grid(row=3,column=1,sticky='ew', pady=12)
+
+btn_frame.grid_columnconfigure(0, weight=1)
+btn_frame.grid_columnconfigure(1, weight=1)
+
+btn_frame.pack(anchor='nw', expand=True, fill='x')
+
+# Create a text widget to display the recorded actions
+def onFrameConfigure(canvas):
+    '''Reset the scroll region to encompass the inner frame'''
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
+action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10, borderwidth=3, relief='sunken')
+action_text.pack(pady=20, padx=20)
+vsb = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+canvas.configure(yscrollcommand=vsb.set)
+
+vsb.pack(side="right", fill="y")
+vsb.pack(side="right", fill="y")
+canvas.pack(side="left", fill="both", expand=True)
+canvas.create_window((4,4), window=action_text, anchor="nw")
+
+action_text.bind("<Configure>", lambda event, canvas=canvas: onFrameConfigure(canvas))
 
 # Bind the space key to record_click function
 def on_entry_focus_in(event): 
@@ -231,5 +290,3 @@ update_actions()
 
 # Start the tkinter main loop
 root.mainloop()
-
-print(actions)
