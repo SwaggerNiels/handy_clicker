@@ -1,0 +1,8 @@
+click;830-100,50,None
+click;832-129,50,None
+type;<variable_path>,50,None
+picture_press-open;Return,200,None
+picture_press-sample;Return,100,None
+type;<i>,150,None
+picture_press-create;Return,200,None
+picture_press-import;Return,300,None

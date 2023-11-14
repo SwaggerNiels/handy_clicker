@@ -2,14 +2,32 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog as fd
 import tkinter.simpledialog as sd
-from tkinter.scrolledtext import ScrolledText
+from idlelib.tooltip import Hovertip
 import pyautogui as pa
-import time
-from files_to_Inspection_Manager import import_window
 
-actions = [] # can be ('click', (x,y)) or ('type', 'some_string') or ('press', 'some_key_combination')
+import time
+import re
+
+from files_to_Inspection_Manager import import_window
+from file_select_ids import file_id_selector
+from pprint import pprint
+
+MY_PATH = '\\'.join(__file__.split('\\')[:-1])
+SIM_MODE = True
+
+actions = [] 
+# can be 
+# ('click', (x,y)) or 
+# ('type', 'some_string') or 
+# ('press', 'some_key_combination')
+
 slider_values = []
 descriptions = []
+
+file_paths = []
+index_pairs = []
+variable_paths = []
+variable_program = {}
 
 human_readable_to_pyautogui = {
     'Tab': '\t',
@@ -23,6 +41,13 @@ human_readable_to_pyautogui = {
     'Percent': '%',
     'Ampersand': '&',
     'Single Quote': "'",
+}
+
+picture_press_dict = {
+    'open' :    ((.5, .5),      'Openen_btn.png'),
+    'sample' :  ((.98, .95),    'Sample_add_btn.png'),
+    'create' :  ((.5, .5),      'Create_btn.png'),
+    'import' :  ((.25, .5),     'Import_btn.png'),
 }
 
 press_options = list(human_readable_to_pyautogui.keys())
@@ -185,46 +210,46 @@ def update_actions(event=None):
     # action_text.config(state=tk.DISABLED)
 
 def execute_program():
-    def execute_actions(type_adapt = None):
+    global variable_program
+
+    def execute_actions(type_adapt = None, actions=actions):
         for i, action in enumerate(actions):
             if action[0] == 'click':
                 x,y = action[1]
-                pa.click(x, y)
+                pa.click(x, y) if not SIM_MODE else print(f'click: {x},{y}')
             elif action[0] == 'type':
                 if type_adapt != None:
                     new_action = action[1]
                     for adaption in type_adapt: #adaption = ('old_substring', 'new_substring')
                         old_s,new_s = adaption
                         new_action = new_action.replace(old_s,new_s)
-                    pa.write(new_action)
+                    pa.write(new_action) if not SIM_MODE else print('type: ',new_action)
                 else:
-                    pa.write(action[1])
+                    pa.write(action[1]) if not SIM_MODE else print('type: ',action[1])
             elif action[0] == 'press':
-                pa.press(human_readable_to_pyautogui[action[1]])
-            elif action[0] == 'picture_press_open':
-                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Openen_btn.png',grayscale=True, confidence=.5)
-                pa.click(x1+w/2, y1+h/2)
-            elif action[0] == 'picture_press_sample':
-                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Sample_add_btn.png',grayscale=True, confidence=.5)
-                pa.click(x1+w*.98, y1+h*.95)
-            elif action[0] == 'picture_press_create':
-                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Create_btn.png',grayscale=True, confidence=.5)
-                pa.click(x1+w/2, y1+h/2)
-            elif action[0] == 'picture_press_import':
-                x1,y1,w,h = pa.locateOnScreen(r'C:\Users\roel\Desktop\Niels_prog\files_to_Inspection_Manager\Import_btn.png',grayscale=True, confidence=.5)
-                pa.click(x1+w*.25, y1+h/2)
+                pa.press(human_readable_to_pyautogui[action[1]]) if not SIM_MODE else print('press: ',action[1])
+            elif action[0].startswith('picture_press'):
+                picture = action[0].split('-')[1]
+                picture_file = picture_press_dict[picture][1]
+                px, py = picture_press_dict[picture][0]
+                try:
+                    x1,y1,w,h = pa.locateOnScreen(MY_PATH + '\\' + picture_press_dict[picture][1],grayscale=True, confidence=.5)
+                    pa.click(x1+px*w, y1+py*h) if not SIM_MODE else print(action[0])
+                except:
+                    print(f'Could not find picture: {picture_file}, should be in same directory as this executable')
                 
             time.sleep(slider_values[i].get()/100)
 
-    variable_program = None
-    # variable_program = {'<i>' : [1,2,3,4]}
-
-    if variable_program == None:
+    if variable_program == {}:
         execute_actions()
     else:
         for variable in variable_program.items():
             for value in variable[1]:
-                execute_actions(type_adapt=[(variable[0],str(value))])
+                execute_actions(type_adapt=[
+                    ('<variable_path>',variable_paths[0]),
+                    (variable[0],str(value)),
+                    ('.xls','.csv'),
+                    ])
 
 def save_program():
     f = fd.asksaveasfile(title='Choose name to save to', mode='w', defaultextension=".prog")
@@ -235,21 +260,25 @@ def save_program():
         f.write(f'{action};{val},{s.get()},{d}\n')
     f.close()
 
-def load_program():
+def load_files():
+    global file_paths
+    file_paths = []
+
     wait_done = tk.StringVar(value='Opening files')
-    import_window(root, wait_done)
+    iw = import_window(root, wait_done, file_paths)
+    file_paths = iw.get_file_paths()
     root.wait_variable(wait_done)
+    iw.destroy()
 
     if wait_done.get() == 'Done':
         global actions, slider_values, descriptions
-        f = fd.askopenfile(title='Choose program to open')
+        f = open(MY_PATH + r'\inspect_manager_load_samples.prog')
         
         actions = []
         slider_values = []
         descriptions = []
 
         for line in f.readlines():
-            print(line)
             a,s,d = line.split(',')
             (action, val) = a.split(';')
             val = val.strip() 
@@ -267,7 +296,31 @@ def load_program():
         update_actions()
     else:
         sd.Dialog(root,'Did not open files')
-        
+
+def set_file_ids():
+    global file_paths, index_pairs
+
+    wait_done = tk.StringVar(value='Opening files')
+    fs = file_id_selector(root,wait_done,file_paths)
+    root.wait_variable(wait_done)
+    index_pairs = fs.get_indeces()
+    fs.destroy()
+
+    make_variable_program()
+    execute_btn.config({'text' : f"Execute program ({len(index_pairs)})"})
+    Hovertip(execute_btn, f'{variable_paths[0]} : {list(variable_program.items())[0]}')
+
+def make_variable_program():
+    global file_paths, variable_paths, variable_program
+
+    variable_program['<i>'] = []
+    for path, inds in zip(file_paths,index_pairs):
+        parameter = path[inds[0]:inds[1]]
+        variable_path = path[:inds[0]] + '<i>' + path[inds[1]:]
+        variable_paths.append(variable_path)
+        variable_program['<i>'].append(parameter)
+
+
 # Create the main window
 root = tk.Tk()
 root.title("Mouse actions Recorder")
@@ -276,11 +329,13 @@ root.title("Mouse actions Recorder")
 btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10)
 
 row=0
-btn = tk.Button(btn_frame, text="Load excel files", command=load_program)
+btn = tk.Button(btn_frame, text="Load excel files", command=load_files)
 btn.grid(row=row,column=0,sticky='ew', pady=1)
+btn = tk.Button(btn_frame, text="Set sample references", command=set_file_ids)
+btn.grid(row=row,column=1,sticky='ew', pady=1)
 row=1
-btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
-btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
+execute_btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
+execute_btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
 row=2
 ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
 row=3

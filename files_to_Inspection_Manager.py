@@ -4,7 +4,7 @@ import re
 import tkinter as tk
 import tkinter.filedialog as fd
 
-class import_window():
+class import_window(tk.Toplevel):
     replace_dictionary = {
         'plaatsz.h.'    : 'TRUE POSITION',
         'afstand x'     : 'LINEAR',
@@ -61,19 +61,19 @@ class import_window():
         'POSITIE' : 'LINEAR', 
     }
     
-    def __init__(self, root : tk.Tk, wait_done : tk.StringVar):
+    def __init__(self, root : tk.Tk, wait_done : tk.StringVar, files):
+        tk.Toplevel.__init__(self)
+        self.protocol("WM_DELETE_WINDOW", self.destroyer)
+        
         self.root = root
         self.wait_done = wait_done
         
+        self.file_paths = []
         self.folder = None
-        self.files = None
-
-        import_window = tk.Toplevel()
-        import_window.protocol("WM_DELETE_WINDOW", self.destroyer)
     
-        lbl = tk.Label (import_window, text='Vertaal xls naar Engels-talige csv')
+        lbl = tk.Label (self, text='Vertaal xls naar Engels-talige csv')
         lbl.grid(column = 0, row = 1)
-        btn = tk.Button(import_window, text='open files', command=self.get_files)
+        btn = tk.Button(self, text='open files', command=self.get_files)
         btn.grid(column = 0, row = 2)
 
     def destroyer(self):
@@ -90,6 +90,8 @@ class import_window():
         self.convert_files()
 
     def convert_files(self):
+        self.file_paths.clear()
+
         for file in self.files:
             if not file.endswith('.xls'):
                 continue
@@ -102,5 +104,10 @@ class import_window():
                 df.iloc[:,0] = df.iloc[:,0].str.replace(pat=key, repl=val, flags=re.I)
 
             df.to_csv(path[:-3]+'csv', index=False,  escapechar="\\", doublequote=False, sep="\t")
+
+            self.file_paths.append(path)
     
         self.wait_done.set('Done')
+    
+    def get_file_paths(self):
+        return(self.file_paths)
