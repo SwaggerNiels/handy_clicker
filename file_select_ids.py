@@ -68,11 +68,6 @@ class file_id_selector(tk.Toplevel):
                     file_label[column].destroy()
 
                 file_label[column] = tk.Label(file_frame, text=t, font=tkfont, image=self.image, width=w, height=h, compound=tk.LEFT, fg=fg_col, bg=bg_col)
-                # if column == 0:
-                #     file_label[column].grid(row=0, column=column, sticky='W', padx=(20,0))
-                # elif column == self.file_len:
-                #     file_label[column].grid(row=0, column=column, sticky='W', padx=(0,40))
-                # else:
                 file_label[column].grid(row=0, column=column, sticky='W')
             
             file_frame.grid(row=3+i, sticky='WE',padx=(20,20))

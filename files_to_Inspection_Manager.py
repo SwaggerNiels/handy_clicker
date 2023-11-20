@@ -96,7 +96,7 @@ class import_window(tk.Toplevel):
             if not file.endswith('.xls'):
                 continue
 
-            path = self.folder+'//'+file
+            path = self.folder+'/'+file
             df = pd.read_excel(path, engine='xlrd')
 
             for key,val in self.replace_dictionary.items():
@@ -105,7 +105,7 @@ class import_window(tk.Toplevel):
 
             df.to_csv(path[:-3]+'csv', index=False,  escapechar="\\", doublequote=False, sep="\t")
 
-            self.file_paths.append(path)
+            self.file_paths.append(path.replace('xls','csv'))
     
         self.wait_done.set('Done')
     

@@ -13,7 +13,7 @@ from file_select_ids import file_id_selector
 from pprint import pprint
 
 MY_PATH = '\\'.join(__file__.split('\\')[:-1])
-SIM_MODE = True
+SIM_MODE = False
 
 actions = [] 
 # can be 
@@ -94,6 +94,15 @@ def record_press(event=None):
 def record_type(event=None):
     typed_input = sd.askstring(title='What to type?', prompt='your input')
     actions.append(('type',typed_input))
+    slider_var = tk.IntVar(value=50)
+    slider_values.append(slider_var)
+    description_var = tk.StringVar(value='')
+    descriptions.append(description_var)
+    update_actions()
+
+def record_popup(event=None):
+    popup_text = sd.askstring(title='What to display in popup?', prompt='your popup text (do not use "-")')
+    actions.append(('popup',popup_text))
     slider_var = tk.IntVar(value=50)
     slider_values.append(slider_var)
     description_var = tk.StringVar(value='')
@@ -214,7 +223,9 @@ def execute_program():
 
     def execute_actions(type_adapt = None, actions=actions):
         for i, action in enumerate(actions):
-            if action[0] == 'click':
+            if action[0].startswith('popup'):
+                popup = sd.Dialog(root, title=action[1])
+            elif action[0] == 'click':
                 x,y = action[1]
                 pa.click(x, y) if not SIM_MODE else print(f'click: {x},{y}')
             elif action[0] == 'type':
@@ -248,7 +259,7 @@ def execute_program():
                 execute_actions(type_adapt=[
                     ('<variable_path>',variable_paths[0]),
                     (variable[0],str(value)),
-                    ('.xls','.csv'),
+                    ('/','\\')
                     ])
 
 def save_program():
@@ -259,6 +270,33 @@ def save_program():
             val = f'{val[0]}-{val[1]}'
         f.write(f'{action};{val},{s.get()},{d}\n')
     f.close()
+
+def load_program():
+    global actions, slider_values, descriptions
+    f = open(MY_PATH + r'\inspect_manager_load_samples.prog')
+    
+    actions = []
+    slider_values = []
+    descriptions = []
+
+    for line in f.readlines():
+        if line == '':
+            continue
+        a,s,d = line.split(',')
+        (action, val) = a.split(';')
+        val = val.strip() 
+        if action == 'click':
+            val = tuple( map(int,val.split('-')) )
+        d = d.strip()
+        d = d if d != 'None' else ''
+        actions.append( (action,val) ) 
+        slider_values.append( tk.IntVar(value=int(s)) )
+        descriptions.append( tk.StringVar(value=d) )
+    f.close()
+
+    on_entry_focus_out(None)
+
+    update_actions()
 
 def load_files():
     global file_paths
@@ -271,29 +309,7 @@ def load_files():
     iw.destroy()
 
     if wait_done.get() == 'Done':
-        global actions, slider_values, descriptions
-        f = open(MY_PATH + r'\inspect_manager_load_samples.prog')
-        
-        actions = []
-        slider_values = []
-        descriptions = []
-
-        for line in f.readlines():
-            a,s,d = line.split(',')
-            (action, val) = a.split(';')
-            val = val.strip() 
-            if action == 'click':
-                val = tuple( map(int,val.split('-')) )
-            d = d.strip()
-            d = d if d != 'None' else ''
-            actions.append( (action,val) ) 
-            slider_values.append( tk.IntVar(value=int(s)) )
-            descriptions.append( tk.StringVar(value=d) )
-        f.close()
-
-        on_entry_focus_out(None)
-
-        update_actions()
+        load_program()
     else:
         sd.Dialog(root,'Did not open files')
 
@@ -320,7 +336,6 @@ def make_variable_program():
         variable_paths.append(variable_path)
         variable_program['<i>'].append(parameter)
 
-
 # Create the main window
 root = tk.Tk()
 root.title("Mouse actions Recorder")
@@ -338,15 +353,24 @@ execute_btn = tk.Button(btn_frame, text="Execute program", command=execute_progr
 execute_btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
 row=2
 ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
+action_btn_frame = tk.Frame(btn_frame, background="#ffffff", height=10, width=10)
+if True:
+    row=0
+    column=0
+    btn = tk.Button(action_btn_frame, text="Add button press", command=record_press)
+    btn.grid(row=row,column=column,sticky='ew')
+    column=1
+    btn = tk.Button(action_btn_frame, text="Add typing text", command=record_type)
+    btn.grid(row=row,column=column,sticky='ew')
+    column=2
+    btn = tk.Button(action_btn_frame, text="Add popup window", command=record_popup)
+    btn.grid(row=row,column=column,sticky='ew')
+
 row=3
-btn = tk.Button(btn_frame, text="Add button press", command=record_press)
-btn.grid(row=row,column=0,sticky='ew', pady=12)
-btn = tk.Button(btn_frame, text="Add typing text", command=record_type)
-btn.grid(row=row,column=1,sticky='ew', pady=12)
+action_btn_frame.grid_columnconfigure([0,1,2], weight=1)
+action_btn_frame.grid(row=row,column=0,sticky='ew', pady=12, columnspan=2)
 
-btn_frame.grid_columnconfigure(0, weight=1)
-btn_frame.grid_columnconfigure(1, weight=1)
-
+btn_frame.grid_columnconfigure([0,1], weight=1)
 btn_frame.pack(anchor='nw', expand=True, fill='x')
 
 # Create a text widget to display the recorded actions
