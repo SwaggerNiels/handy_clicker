@@ -8,12 +8,12 @@ import pyautogui as pa
 import time
 import re
 
-from files_to_Inspection_Manager import import_window
+from RoundedButton import RoundedButton
+from files_to_Inspection_Manager import sample_importer
 from file_select_ids import file_id_selector
 from pprint import pprint
 
 MY_PATH = '\\'.join(__file__.split('\\')[:-1])
-SIM_MODE = False
 
 actions = [] 
 # can be 
@@ -44,10 +44,14 @@ human_readable_to_pyautogui = {
 }
 
 picture_press_dict = {
-    'open' :    ((.5, .5),      'Openen_btn.png'),
-    'sample' :  ((.98, .95),    'Sample_add_btn.png'),
-    'create' :  ((.5, .5),      'Create_btn.png'),
-    'import' :  ((.25, .5),     'Import_btn.png'),
+    'open' :    ((.5,   .5),     'Openen_btn.png'),
+    'next' :    ((.5,   .5),     'Preset_next_btn.png'),
+    'sample' :  ((.05,  .95),    'Sample_add_btn.png'),
+    'create' :  ((.5,   .5),     'Create_btn.png'),
+    'results':  ((.75,  .5),     'Import_insp_btn.png'),
+    'import' :  ((.25,  .5),     'Import_btn.png'),
+    'lot_add' : ((.05,  .95),    'Lot_add_btn.png'),
+    'lot_ok' :  ((.25,  .5),     'Lot_ok_btn.png'),
 }
 
 press_options = list(human_readable_to_pyautogui.keys())
@@ -218,49 +222,94 @@ def update_actions(event=None):
 
     # action_text.config(state=tk.DISABLED)
 
+def slice_parser():
+
+    def func(my_string : str):
+        if not my_string.__contains__(':'):
+            return(int(my_string))
+        return slice(*map(lambda x: int(x.strip()) if x.strip() else None, my_string.split(':'))) 
+    
+    return func
+
 def execute_program():
     global variable_program
 
-    def execute_actions(type_adapt = None, actions=actions):
+    if new_lot_bool.get():
+        load_program(r'\inspect_manager_load_samples_newlot.prog')
+    else:
+        load_program(r'\inspect_manager_load_samples.prog')
+
+    def execute_actions(actions=actions, i_parameter_set=None, parameter_indices=None):
         for i, action in enumerate(actions):
+            SIM_MODE = sim_mode.get()
             if action[0].startswith('popup'):
-                popup = sd.Dialog(root, title=action[1])
+                popup = sd.Dialog(root, title=action[1]) if not SIM_MODE else print(f'popup: {action[1]}')
             elif action[0] == 'click':
                 x,y = action[1]
                 pa.click(x, y) if not SIM_MODE else print(f'click: {x},{y}')
             elif action[0] == 'type':
-                if type_adapt != None:
-                    new_action = action[1]
-                    for adaption in type_adapt: #adaption = ('old_substring', 'new_substring')
-                        old_s,new_s = adaption
-                        new_action = new_action.replace(old_s,new_s)
-                    pa.write(new_action) if not SIM_MODE else print('type: ',new_action)
+                if i_parameter_set != None:
+                    parameter_index,parameter_set = i_parameter_set
+                    for parameter_index,parameter_set in enumerate(parameter_sets): # for each parameter witin the variable adapt (if within optional slice)
+                        adapted_action = action[1]
+                        for variable_name,parameter in parameter_set:
+                            variable_replace=[(variable_name,parameter)] # the replace list of the variable
+                                                
+                            if variable_replace != None: # if variable is typing variable this will be done
+                                for adaption in variable_replace: #Do an adaption to the original typing-action
+                                    # adaption = ('old_substring', 'new_substring')
+                                    old_s,new_s = adaption
+                                    if parameter_index != None:
+                                        sp = slice_parser()
+                                        var_pattern = old_s + r'\[([0-9\:]*)\]'
+                                        # print('adapted_action: ', adapted_action)
+                                        # print("var_pattern: ", var_pattern)
+                                        # print("find?: ", re.findall(var_pattern, adapted_action))
+                                        if re.search(var_pattern, adapted_action) == None:
+                                            continue
+                                        slice_str = re.findall(var_pattern, adapted_action)[0]
+                                        indices = parameter_indices[sp(slice_str)]
+                                        if not hasattr(indices, '__iter__'):
+                                            indices = [indices]
+                                        print(parameter_index, ' in? ', indices)
+                                        if parameter_index not in indices:
+                                            continue
+                                        old_s = '<' + re.search(var_pattern, adapted_action)[0] + '>'
+                                        adapted_action = adapted_action.replace(old_s,new_s)
+                        print('ADAPTED ACTION: ', adapted_action)
+                    pa.write(adapted_action) if not SIM_MODE else print('type: ',adapted_action)
                 else:
                     pa.write(action[1]) if not SIM_MODE else print('type: ',action[1])
             elif action[0] == 'press':
                 pa.press(human_readable_to_pyautogui[action[1]]) if not SIM_MODE else print('press: ',action[1])
             elif action[0].startswith('picture_press'):
                 picture = action[0].split('-')[1]
-                picture_file = picture_press_dict[picture][1]
+                picture_file = MY_PATH + '\\' + picture_press_dict[picture][1]
                 px, py = picture_press_dict[picture][0]
                 try:
-                    x1,y1,w,h = pa.locateOnScreen(MY_PATH + '\\' + picture_press_dict[picture][1],grayscale=True, confidence=.5)
-                    pa.click(x1+px*w, y1+py*h) if not SIM_MODE else print(action[0])
+                    loc = pa.locateOnScreen(picture_file,grayscale=True, confidence=.5) if not SIM_MODE else print('picture: ',picture)
                 except:
-                    print(f'Could not find picture: {picture_file}, should be in same directory as this executable')
+                    print(f'Could not find picture on screen, picture path should be:\n{picture_file}, ')
+                else:
+                    if not SIM_MODE:
+                        x1,y1,w,h = loc
+                        pa.click(x1+px*w, y1+py*h)
                 
             time.sleep(slider_values[i].get()/100)
 
     if variable_program == {}:
         execute_actions()
     else:
-        for variable in variable_program.items():
-            for value in variable[1]:
-                execute_actions(type_adapt=[
-                    ('<variable_path>',variable_paths[0]),
-                    (variable[0],str(value)),
-                    ('/','\\')
-                    ])
+        parameter_sets = [
+            [(key,parameter[i]) 
+             for key,parameter in variable_program.items()]
+             for i in range(len(list(variable_program.items())[0][1]))]
+
+        parameter_indices = list(range(len(parameter_sets)))
+        for i_parameter_set in enumerate(parameter_sets):
+            execute_actions(actions, 
+                            i_parameter_set, 
+                            parameter_indices)
 
 def save_program():
     f = fd.asksaveasfile(title='Choose name to save to', mode='w', defaultextension=".prog")
@@ -271,16 +320,16 @@ def save_program():
         f.write(f'{action};{val},{s.get()},{d}\n')
     f.close()
 
-def load_program():
+def load_program(prog = r'\inspect_manager_load_samples.prog'):
     global actions, slider_values, descriptions
-    f = open(MY_PATH + r'\inspect_manager_load_samples.prog')
+    f = open(MY_PATH + prog)
     
     actions = []
     slider_values = []
     descriptions = []
 
     for line in f.readlines():
-        if line == '':
+        if line.strip() == '':
             continue
         a,s,d = line.split(',')
         (action, val) = a.split(';')
@@ -303,13 +352,13 @@ def load_files():
     file_paths = []
 
     wait_done = tk.StringVar(value='Opening files')
-    iw = import_window(root, wait_done, file_paths)
+    iw = sample_importer(root, wait_done, file_paths)
     file_paths = iw.get_file_paths()
+    print(file_paths)
     root.wait_variable(wait_done)
-    iw.destroy()
 
     if wait_done.get() == 'Done':
-        load_program()
+        pass
     else:
         sd.Dialog(root,'Did not open files')
 
@@ -320,91 +369,117 @@ def set_file_ids():
     fs = file_id_selector(root,wait_done,file_paths)
     root.wait_variable(wait_done)
     index_pairs = fs.get_indeces()
+    print(index_pairs)
     fs.destroy()
 
     make_variable_program()
     execute_btn.config({'text' : f"Execute program ({len(index_pairs)})"})
-    Hovertip(execute_btn, f'{variable_paths[0]} : {list(variable_program.items())[0]}')
+    Hovertip(execute_btn, f'variable program:\n{variable_program}')
 
 def make_variable_program():
-    global file_paths, variable_paths, variable_program
+    global file_paths, variable_program
 
-    variable_program['<i>'] = []
+    variable_program['path_pre_id'] = []
+    variable_program['i'] = []
+    variable_program['path_post_id'] = []
+
     for path, inds in zip(file_paths,index_pairs):
         parameter = path[inds[0]:inds[1]]
-        variable_path = path[:inds[0]] + '<i>' + path[inds[1]:]
-        variable_paths.append(variable_path)
-        variable_program['<i>'].append(parameter)
+        variable_program['path_pre_id'].append(path[:inds[0]])
+        variable_program['i'].append(parameter)
+        variable_program['path_post_id'].append(path[inds[1]:])
 
 # Create the main window
-root = tk.Tk()
-root.title("Mouse actions Recorder")
+try:
+    root = tk.Tk()
+    root.title("Mouse actions Recorder")
 
-# Create a button to click all the recorded actions
-btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10)
+    # Create a button to click all the recorded actions
+    btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10)
 
-row=0
-btn = tk.Button(btn_frame, text="Load excel files", command=load_files)
-btn.grid(row=row,column=0,sticky='ew', pady=1)
-btn = tk.Button(btn_frame, text="Set sample references", command=set_file_ids)
-btn.grid(row=row,column=1,sticky='ew', pady=1)
-row=1
-execute_btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
-execute_btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
-row=2
-ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
-action_btn_frame = tk.Frame(btn_frame, background="#ffffff", height=10, width=10)
-if True:
     row=0
-    column=0
-    btn = tk.Button(action_btn_frame, text="Add button press", command=record_press)
-    btn.grid(row=row,column=column,sticky='ew')
-    column=1
-    btn = tk.Button(action_btn_frame, text="Add typing text", command=record_type)
-    btn.grid(row=row,column=column,sticky='ew')
-    column=2
-    btn = tk.Button(action_btn_frame, text="Add popup window", command=record_popup)
-    btn.grid(row=row,column=column,sticky='ew')
+    btn = tk.Button(btn_frame, text="Load + convert sample files", command=load_files)
+    btn.grid(row=row,column=0,sticky='ew', pady=1)
+    btn = tk.Button(btn_frame, text="Set sample references", command=set_file_ids)
+    btn.grid(row=row,column=1,sticky='ew', pady=1)
+    row=1
+    new_lot_bool = tk.BooleanVar(root,True)
+    btn = tk.Checkbutton(btn_frame, text="Add new lot", variable=new_lot_bool)
+    btn.grid(row=row,column=0,sticky='ew', pady=5)
+    sim_mode = tk.BooleanVar(value=True)
+    btn = tk.Checkbutton(btn_frame, text="Simulation_only", variable=sim_mode)
+    btn.grid(row=row,column=1,sticky='ew', pady=5)
+    row=2
+    ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2,pady=5, sticky='ew')
+    execute_btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
+    execute_btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
+    row=3
+    ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
+    action_btn_frame = tk.Frame(btn_frame, background="#ffffff", height=10, width=10)
+    if True:
+        row=0
+        params = {
+            'width' : 150,
+            'height' : 20,
+            'cornerradius' : 5,
+        }
+        column=0
+        btn = RoundedButton(action_btn_frame, text="Add button press", command=record_press, **params)
+        btn.grid(row=row,column=column,sticky='ew')
+        column=1
+        btn = RoundedButton(action_btn_frame, text="Add typing text", command=record_type, **params)
+        btn.grid(row=row,column=column,sticky='ew')
+        column=2
+        btn = RoundedButton(action_btn_frame, text="Add popup window", command=record_popup, **params)
+        btn.grid(row=row,column=column,sticky='ew')
 
-row=3
-action_btn_frame.grid_columnconfigure([0,1,2], weight=1)
-action_btn_frame.grid(row=row,column=0,sticky='ew', pady=12, columnspan=2)
+    row=4
+    action_btn_frame.grid_columnconfigure([0,1,2], weight=1)
+    action_btn_frame.grid(row=row,column=0,sticky='ew', pady=12, columnspan=2)
 
-btn_frame.grid_columnconfigure([0,1], weight=1)
-btn_frame.pack(anchor='nw', expand=True, fill='x')
+    btn_frame.grid_columnconfigure([0,1], weight=1)
+    btn_frame.pack(anchor='nw', expand=True, fill='x')
 
-# Create a text widget to display the recorded actions
-def onFrameConfigure(canvas):
-    '''Reset the scroll region to encompass the inner frame'''
-    canvas.configure(scrollregion=canvas.bbox("all"))
+    # Create a text widget to display the recorded actions
+    def onFrameConfigure(canvas):
+        '''Reset the scroll region to encompass the inner frame'''
+        canvas.configure(scrollregion=canvas.bbox("all"))
 
-canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
-action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10)
-action_text.pack(pady=20, padx=20)
-vsb = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
-canvas.configure(yscrollcommand=vsb.set)
+    canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
+    action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10)
+    action_text.pack(pady=20, padx=20)
+    vsb = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=vsb.set)
 
-vsb.pack(side="right", fill="y")
-vsb.pack(side="right", fill="y")
-canvas.pack(side="left", fill="both", expand=True)
-canvas.create_window((4,4), window=action_text, anchor="nw")
+    vsb.pack(side="right", fill="y")
+    vsb.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas.create_window((4,4), window=action_text, anchor="nw")
 
-action_text.bind("<Configure>", lambda event, canvas=canvas: onFrameConfigure(canvas))
+    action_text.bind("<Configure>", lambda event, canvas=canvas: onFrameConfigure(canvas))
 
-# Bind the space key to record_click function
-def on_entry_focus_in(event): 
-    root.unbind('<space>')  # Unbind the Space key
-    root.bind('<Return>', lambda event : root.focus_set())  # Unbind the Space key
-def on_entry_focus_out(event): 
-    root.bind('<space>', record_click)  # Rebind the Space key
-    root.unbind('<Return>')
-on_entry_focus_out(None)
-root.bind('<Escape>', lambda event : root.destroy())
+    # Bind the space key to record_click function
+    def on_entry_focus_in(event): 
+        root.unbind('<space>')  # Unbind the Space key
+        root.bind('<Return>', lambda event : root.focus_set())  # Unbind the Space key
+    def on_entry_focus_out(event): 
+        root.bind('<space>', record_click)  # Rebind the Space key
+        root.unbind('<Return>')
+    on_entry_focus_out(None)
+    root.bind('<Escape>', lambda event=None : root.destroy())
 
-update_actions()
+    update_actions()
 
-# Start the tkinter main loop
-root.mainloop()
+    # Start the tkinter main loop
+    root.protocol("WM_DELETE_WINDOW",root.destroy)
+    root.mainloop()
+except:
+    print('errored')
+finally:
+    try:
+        root.destroy()
+    except:
+        print('already destroyed root')
 
 from pprint import pprint
 pprint(actions)

@@ -1,5 +1,6 @@
 click;830-100,50,None
-click;832-129,50,None
+click;907-130,50,None
+picture_press-next;Return,1200,None
 type;<variable_path>,50,None
 picture_press-open;Return,200,None
 picture_press-sample;Return,100,None

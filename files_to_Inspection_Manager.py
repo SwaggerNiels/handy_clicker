@@ -4,7 +4,7 @@ import re
 import tkinter as tk
 import tkinter.filedialog as fd
 
-class import_window(tk.Toplevel):
+class sample_importer():
     replace_dictionary = {
         'plaatsz.h.'    : 'TRUE POSITION',
         'afstand x'     : 'LINEAR',
@@ -62,26 +62,24 @@ class import_window(tk.Toplevel):
     }
     
     def __init__(self, root : tk.Tk, wait_done : tk.StringVar, files):
-        tk.Toplevel.__init__(self)
-        self.protocol("WM_DELETE_WINDOW", self.destroyer)
         
         self.root = root
         self.wait_done = wait_done
         
         self.file_paths = []
         self.folder = None
-    
-        lbl = tk.Label (self, text='Vertaal xls naar Engels-talige csv')
-        lbl.grid(column = 0, row = 1)
-        btn = tk.Button(self, text='open files', command=self.get_files)
-        btn.grid(column = 0, row = 2)
 
-    def destroyer(self):
+        try:
+            self.get_files()
+        except:
+            print('Files could not be registered')
+
+    def __del__(self):
         self.wait_done.set('Failed')
 
     def get_files(self):
         self.files = fd.askopenfilenames(parent=self.root, title='Choose xls-files')
-        self.folder,self.files = ('/'.join(self.files[0].split('/')[:-1]), [file.split('/')[-1] for file in self.files])
+        self.folder,self.files = ('\\'.join(self.files[0].split('/')[:-1]), [file.split('/')[-1] for file in self.files])
         self.convert_files()
 
     def get_folder(self):
@@ -93,10 +91,16 @@ class import_window(tk.Toplevel):
         self.file_paths.clear()
 
         for file in self.files:
+            path = self.folder+'\\'+file
+
+            if file.endswith('.csv'):
+                self.file_paths.append(path)
+                print('path added')
+                continue
+            
             if not file.endswith('.xls'):
                 continue
 
-            path = self.folder+'/'+file
             df = pd.read_excel(path, engine='xlrd')
 
             for key,val in self.replace_dictionary.items():
