@@ -44,12 +44,14 @@ human_readable_to_pyautogui = {
 }
 
 picture_press_dict = {
-    'open' :    ((.5,   .5),     'Openen_btn.png'),
-    'next' :    ((.5,   .5),     'Preset_next_btn.png'),
-    'sample' :  ((.05,  .95),    'Sample_add_btn.png'),
-    'create' :  ((.5,   .5),     'Create_btn.png'),
     'results':  ((.75,  .5),     'Import_insp_btn.png'),
-    'import' :  ((.25,  .5),     'Import_btn.png'),
+    'preset':   ((.5,   .5),     'Import_preset_btn.png'),
+    'open' :    ((.5,   .5),     'Openen_btn.png'),
+    'mcosmos' : ((.02,  .98),    'Mcosmos_preset_btn.png'),
+    'next' :    ((.5,   .98),    'Preset_next_btn.png'),
+    'sample' :  ((.99,  .01),    'Sample_add_btn.png'),
+    'create' :  ((.5,   .5),     'Create_btn.png'),
+    'finish' :  ((.5,   .99),    'Finish_btn.png'),
     'lot_add' : ((.05,  .95),    'Lot_add_btn.png'),
     'lot_ok' :  ((.25,  .5),     'Lot_ok_btn.png'),
 }
@@ -204,7 +206,7 @@ def update_actions(event=None):
         
         slider_label = tk.Label(action_text, textvariable=slider_values[i])
         slider_label.grid(row=i+1, column=2, sticky='W')
-        slider = tk.Scale(action_text, from_=0, to=1000, orient="horizontal", variable=slider_values[i],
+        slider = tk.Scale(action_text, from_=0, to=2000, orient="horizontal", variable=slider_values[i],
                           length=200, resolution=25, command=set_action_labels, showvalue=0)
         slider_widgets.append((slider_label,slider))
         slider.grid(row=i+1, column=3)
@@ -231,6 +233,47 @@ def slice_parser():
     
     return func
 
+def action_set_parameter(action, variable_name, parameter, parameter_index, parameter_indices):
+    variable_replace=[(variable_name,parameter)] # the replace list of the variable
+                                                
+    if variable_replace != None: # if variable is typing variable this will be done
+        for adaption in variable_replace: #Do an adaption to the original typing-action
+            # adaption = ('old_substring', 'new_substring')
+            old_s,new_s = adaption
+            if parameter_index != None:
+                sp = slice_parser()
+                # print('action: ', action)
+                # print("var_pattern: ", var_pattern)
+                # print("find?: ", re.findall(var_pattern, action))
+                var_pattern = old_s
+                # print('var_pattern: ', var_pattern)
+                # print('action: ', action)
+                if re.search(var_pattern, action) == None:
+                    continue
+                else:
+                    # print('found: ',re.search(var_pattern, action)[0])
+
+                    indexed_var_pattern = old_s + r'\[([0-9\:]*)\]'
+                    if re.search(indexed_var_pattern, action) != None:
+                        slice_str = re.findall(indexed_var_pattern, action)[0]
+                        indices = parameter_indices[sp(slice_str)]
+                        if not hasattr(indices, '__iter__'):
+                            indices = [indices]
+                        # print(parameter_index, ' in? ', indices)
+                        if parameter_index not in indices:
+                            continue
+                        old_s = '<' + re.search(indexed_var_pattern, action)[0] + '>'
+                        action = action.replace(old_s,new_s)
+                        continue
+
+                    old_s = '<' + re.search(var_pattern, action)[0] + '>'
+                    action = action.replace(old_s,new_s)
+                    continue
+
+    return(action)
+
+                             
+
 def execute_program():
     global variable_program
 
@@ -239,7 +282,7 @@ def execute_program():
     else:
         load_program(r'\inspect_manager_load_samples.prog')
 
-    def execute_actions(actions=actions, i_parameter_set=None, parameter_indices=None):
+    def execute_actions(actions=actions, parameter_set=None, parameter_index=None, parameter_indices=None):
         for i, action in enumerate(actions):
             SIM_MODE = sim_mode.get()
             if action[0].startswith('popup'):
@@ -248,35 +291,15 @@ def execute_program():
                 x,y = action[1]
                 pa.click(x, y) if not SIM_MODE else print(f'click: {x},{y}')
             elif action[0] == 'type':
-                if i_parameter_set != None:
-                    parameter_index,parameter_set = i_parameter_set
-                    for parameter_index,parameter_set in enumerate(parameter_sets): # for each parameter witin the variable adapt (if within optional slice)
-                        adapted_action = action[1]
-                        for variable_name,parameter in parameter_set:
-                            variable_replace=[(variable_name,parameter)] # the replace list of the variable
-                                                
-                            if variable_replace != None: # if variable is typing variable this will be done
-                                for adaption in variable_replace: #Do an adaption to the original typing-action
-                                    # adaption = ('old_substring', 'new_substring')
-                                    old_s,new_s = adaption
-                                    if parameter_index != None:
-                                        sp = slice_parser()
-                                        var_pattern = old_s + r'\[([0-9\:]*)\]'
-                                        # print('adapted_action: ', adapted_action)
-                                        # print("var_pattern: ", var_pattern)
-                                        # print("find?: ", re.findall(var_pattern, adapted_action))
-                                        if re.search(var_pattern, adapted_action) == None:
-                                            continue
-                                        slice_str = re.findall(var_pattern, adapted_action)[0]
-                                        indices = parameter_indices[sp(slice_str)]
-                                        if not hasattr(indices, '__iter__'):
-                                            indices = [indices]
-                                        print(parameter_index, ' in? ', indices)
-                                        if parameter_index not in indices:
-                                            continue
-                                        old_s = '<' + re.search(var_pattern, adapted_action)[0] + '>'
-                                        adapted_action = adapted_action.replace(old_s,new_s)
-                        print('ADAPTED ACTION: ', adapted_action)
+                if parameter_set != None:
+                    adapted_action = action[1]
+                    for var,par in parameter_set:
+                        adapted_action = action_set_parameter(adapted_action,
+                                                                var,
+                                                                par,
+                                                                parameter_index,
+                                                                parameter_indices,)
+                    print('ADAPTED ACTION: ', adapted_action)
                     pa.write(adapted_action) if not SIM_MODE else print('type: ',adapted_action)
                 else:
                     pa.write(action[1]) if not SIM_MODE else print('type: ',action[1])
@@ -287,7 +310,8 @@ def execute_program():
                 picture_file = MY_PATH + '\\' + picture_press_dict[picture][1]
                 px, py = picture_press_dict[picture][0]
                 try:
-                    loc = pa.locateOnScreen(picture_file,grayscale=True, confidence=.5) if not SIM_MODE else print('picture: ',picture)
+                    print('picture: ',picture)
+                    loc = pa.locateOnScreen(picture_file,grayscale=True, confidence=.5) if not SIM_MODE else print('picture pressed')
                 except:
                     print(f'Could not find picture on screen, picture path should be:\n{picture_file}, ')
                 else:
@@ -306,9 +330,10 @@ def execute_program():
              for i in range(len(list(variable_program.items())[0][1]))]
 
         parameter_indices = list(range(len(parameter_sets)))
-        for i_parameter_set in enumerate(parameter_sets):
+        for parameter_index,parameter_set in enumerate(parameter_sets):
             execute_actions(actions, 
-                            i_parameter_set, 
+                            parameter_set,
+                            parameter_index, 
                             parameter_indices)
 
 def save_program():
@@ -403,9 +428,9 @@ try:
     btn = tk.Button(btn_frame, text="Set sample references", command=set_file_ids)
     btn.grid(row=row,column=1,sticky='ew', pady=1)
     row=1
-    new_lot_bool = tk.BooleanVar(root,True)
-    btn = tk.Checkbutton(btn_frame, text="Add new lot", variable=new_lot_bool)
-    btn.grid(row=row,column=0,sticky='ew', pady=5)
+    new_lot_bool = tk.BooleanVar(root,False)
+    # btn = tk.Checkbutton(btn_frame, text="Add new lot", variable=new_lot_bool)
+    # btn.grid(row=row,column=0,sticky='ew', pady=5)
     sim_mode = tk.BooleanVar(value=True)
     btn = tk.Checkbutton(btn_frame, text="Simulation_only", variable=sim_mode)
     btn.grid(row=row,column=1,sticky='ew', pady=5)
@@ -471,7 +496,6 @@ try:
     update_actions()
 
     # Start the tkinter main loop
-    root.protocol("WM_DELETE_WINDOW",root.destroy)
     root.mainloop()
 except:
     print('errored')
@@ -480,6 +504,7 @@ finally:
         root.destroy()
     except:
         print('already destroyed root')
+    from pprint import pprint
+    pprint(actions)
+    quit()
 
-from pprint import pprint
-pprint(actions)
