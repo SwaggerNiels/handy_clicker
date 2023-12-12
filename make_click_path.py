@@ -272,8 +272,6 @@ def action_set_parameter(action, variable_name, parameter, parameter_index, para
 
     return(action)
 
-                             
-
 def execute_program():
     global variable_program
 
@@ -415,96 +413,86 @@ def make_variable_program():
         variable_program['path_post_id'].append(path[inds[1]:])
 
 # Create the main window
-try:
-    root = tk.Tk()
-    root.title("Mouse actions Recorder")
+root = tk.Tk()
+root.title("Mouse actions Recorder")
 
-    # Create a button to click all the recorded actions
-    btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10)
+# Create a button to click all the recorded actions
+btn_frame = tk.Frame(root, background="#ffffff", height=10, width=10)
 
+row=0
+btn = tk.Button(btn_frame, text="Load + convert sample files", command=load_files)
+btn.grid(row=row,column=0,sticky='ew', pady=1)
+btn = tk.Button(btn_frame, text="Set sample references", command=set_file_ids)
+btn.grid(row=row,column=1,sticky='ew', pady=1)
+row=1
+new_lot_bool = tk.BooleanVar(root,False)
+# btn = tk.Checkbutton(btn_frame, text="Add new lot", variable=new_lot_bool)
+# btn.grid(row=row,column=0,sticky='ew', pady=5)
+sim_mode = tk.BooleanVar(value=False)
+btn = tk.Checkbutton(btn_frame, text="Simulation_only", variable=sim_mode)
+btn.grid(row=row,column=1,sticky='ew', pady=5)
+row=2
+ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2,pady=5, sticky='ew')
+execute_btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
+execute_btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
+row=3
+ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
+action_btn_frame = tk.Frame(btn_frame, background="#ffffff", height=10, width=10)
+if True:
     row=0
-    btn = tk.Button(btn_frame, text="Load + convert sample files", command=load_files)
-    btn.grid(row=row,column=0,sticky='ew', pady=1)
-    btn = tk.Button(btn_frame, text="Set sample references", command=set_file_ids)
-    btn.grid(row=row,column=1,sticky='ew', pady=1)
-    row=1
-    new_lot_bool = tk.BooleanVar(root,False)
-    # btn = tk.Checkbutton(btn_frame, text="Add new lot", variable=new_lot_bool)
-    # btn.grid(row=row,column=0,sticky='ew', pady=5)
-    sim_mode = tk.BooleanVar(value=True)
-    btn = tk.Checkbutton(btn_frame, text="Simulation_only", variable=sim_mode)
-    btn.grid(row=row,column=1,sticky='ew', pady=5)
-    row=2
-    ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2,pady=5, sticky='ew')
-    execute_btn = tk.Button(btn_frame, text="Execute program", command=execute_program)
-    execute_btn.grid(row=row,column=0,sticky='ew', pady=5, columnspan=2)
-    row=3
-    ttk.Separator(btn_frame, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2, sticky='ew')
-    action_btn_frame = tk.Frame(btn_frame, background="#ffffff", height=10, width=10)
-    if True:
-        row=0
-        params = {
-            'width' : 150,
-            'height' : 20,
-            'cornerradius' : 5,
-        }
-        column=0
-        btn = RoundedButton(action_btn_frame, text="Add button press", command=record_press, **params)
-        btn.grid(row=row,column=column,sticky='ew')
-        column=1
-        btn = RoundedButton(action_btn_frame, text="Add typing text", command=record_type, **params)
-        btn.grid(row=row,column=column,sticky='ew')
-        column=2
-        btn = RoundedButton(action_btn_frame, text="Add popup window", command=record_popup, **params)
-        btn.grid(row=row,column=column,sticky='ew')
+    params = {
+        'width' : 150,
+        'height' : 20,
+        'cornerradius' : 5,
+    }
+    column=0
+    btn = RoundedButton(action_btn_frame, text="Add button press", command=record_press, **params)
+    btn.grid(row=row,column=column,sticky='ew')
+    column=1
+    btn = RoundedButton(action_btn_frame, text="Add typing text", command=record_type, **params)
+    btn.grid(row=row,column=column,sticky='ew')
+    column=2
+    btn = RoundedButton(action_btn_frame, text="Add popup window", command=record_popup, **params)
+    btn.grid(row=row,column=column,sticky='ew')
 
-    row=4
-    action_btn_frame.grid_columnconfigure([0,1,2], weight=1)
-    action_btn_frame.grid(row=row,column=0,sticky='ew', pady=12, columnspan=2)
+row=4
+action_btn_frame.grid_columnconfigure([0,1,2], weight=1)
+action_btn_frame.grid(row=row,column=0,sticky='ew', pady=12, columnspan=2)
 
-    btn_frame.grid_columnconfigure([0,1], weight=1)
-    btn_frame.pack(anchor='nw', expand=True, fill='x')
+btn_frame.grid_columnconfigure([0,1], weight=1)
+btn_frame.pack(anchor='nw', expand=True, fill='x')
 
-    # Create a text widget to display the recorded actions
-    def onFrameConfigure(canvas):
-        '''Reset the scroll region to encompass the inner frame'''
-        canvas.configure(scrollregion=canvas.bbox("all"))
+# Create a text widget to display the recorded actions
+def onFrameConfigure(canvas):
+    '''Reset the scroll region to encompass the inner frame'''
+    canvas.configure(scrollregion=canvas.bbox("all"))
 
-    canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
-    action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10)
-    action_text.pack(pady=20, padx=20)
-    vsb = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
-    canvas.configure(yscrollcommand=vsb.set)
+canvas = tk.Canvas(root, borderwidth=0, background="#ffffff")
+action_text = tk.Frame(canvas, background="#ffffff", height=10, width=10)
+action_text.pack(pady=20, padx=20)
+vsb = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+canvas.configure(yscrollcommand=vsb.set)
 
-    vsb.pack(side="right", fill="y")
-    vsb.pack(side="right", fill="y")
-    canvas.pack(side="left", fill="both", expand=True)
-    canvas.create_window((4,4), window=action_text, anchor="nw")
+vsb.pack(side="right", fill="y")
+vsb.pack(side="right", fill="y")
+canvas.pack(side="left", fill="both", expand=True)
+canvas.create_window((4,4), window=action_text, anchor="nw")
 
-    action_text.bind("<Configure>", lambda event, canvas=canvas: onFrameConfigure(canvas))
+action_text.bind("<Configure>", lambda event, canvas=canvas: onFrameConfigure(canvas))
 
-    # Bind the space key to record_click function
-    def on_entry_focus_in(event): 
-        root.unbind('<space>')  # Unbind the Space key
-        root.bind('<Return>', lambda event : root.focus_set())  # Unbind the Space key
-    def on_entry_focus_out(event): 
-        root.bind('<space>', record_click)  # Rebind the Space key
-        root.unbind('<Return>')
-    on_entry_focus_out(None)
-    root.bind('<Escape>', lambda event=None : root.destroy())
+# Bind the space key to record_click function
+def on_entry_focus_in(event): 
+    root.unbind('<space>')  # Unbind the Space key
+    root.bind('<Return>', lambda event : root.focus_set())  # Unbind the Space key
+def on_entry_focus_out(event): 
+    root.bind('<space>', record_click)  # Rebind the Space key
+    root.unbind('<Return>')
+on_entry_focus_out(None)
+root.bind('<Escape>', lambda event=None : root.destroy())
 
-    update_actions()
+update_actions()
 
-    # Start the tkinter main loop
-    root.mainloop()
-except:
-    print('errored')
-finally:
-    try:
-        root.destroy()
-    except:
-        print('already destroyed root')
-    from pprint import pprint
-    pprint(actions)
-    quit()
+# Start the tkinter main loop
+root.mainloop()
 
+pprint(actions)

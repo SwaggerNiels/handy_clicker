@@ -79,11 +79,13 @@ class sample_importer():
 
     def get_files(self):
         self.files = fd.askopenfilenames(parent=self.root, title='Choose xls-files')
+        self.files = sorted(self.files)
         self.folder,self.files = ('\\'.join(self.files[0].split('/')[:-1]), [file.split('/')[-1] for file in self.files])
         self.convert_files()
 
     def get_folder(self):
         self.folder = fd.askdirectory(parent=self.root, title='Choose a folder with xls-files')
+        self.files = sorted(self.files)
         self.files = list(filter(lambda x : x.endswith('xls'),next(os.walk(self.folder), (None, None, []))[2]))
         self.convert_files()
 

@@ -63,7 +63,6 @@ class file_id_selector(tk.Toplevel):
             file_frame = tk.Frame(self)
 
             iterator = list(enumerate(file_name))
-            print(iterator)
             for column, t in iterator:
                 if self.folder_len + column < self.start.get() or self.folder_len + column > self.end.get():
                     # outside
