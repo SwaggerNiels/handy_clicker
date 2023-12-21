@@ -206,7 +206,7 @@ def update_actions(event=None):
         
         slider_label = tk.Label(action_text, textvariable=slider_values[i])
         slider_label.grid(row=i+1, column=2, sticky='W')
-        slider = tk.Scale(action_text, from_=0, to=2000, orient="horizontal", variable=slider_values[i],
+        slider = tk.Scale(action_text, from_=0, to=5000, orient="horizontal", variable=slider_values[i],
                           length=200, resolution=25, command=set_action_labels, showvalue=0)
         slider_widgets.append((slider_label,slider))
         slider.grid(row=i+1, column=3)

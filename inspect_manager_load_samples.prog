@@ -3,8 +3,8 @@ picture_press-preset;Return,25,None
 type;<path_pre_id><i><path_post_id>,50,None
 picture_press-open;Return,100,None
 press;Enter,25,None
-picture_press-next;Return,1500,None
+picture_press-next;Return,2000,None
 picture_press-sample;Return,200,None
 type;<i>,150,None
-picture_press-create;Return,600,None
-picture_press-finish;Return,2000,None
+picture_press-create;Return,5000,None
+picture_press-finish;Return,5000,None
